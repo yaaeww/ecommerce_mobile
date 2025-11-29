@@ -1,0 +1,30 @@
+name: umkm_indramayu_mobile
+description: Aplikasi Mobile UMKM Indramayu
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.1.0
+  provider: ^6.1.1
+  font_awesome_flutter: ^10.5.0
+  google_maps_flutter: ^2.2.6
+  url_launcher: ^6.1.11
+  shared_preferences: ^2.2.2
+  cached_network_image: ^3.3.0
+  pull_to_refresh: ^2.0.0
+  intl: ^0.18.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
