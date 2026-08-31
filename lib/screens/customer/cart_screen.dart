@@ -8,6 +8,7 @@ import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
 import '../../models/models.dart';
 import '../../layouts/customer_navbar.dart';
+import 'checkout_screen.dart'; // Import halaman checkout
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -65,11 +66,10 @@ class _CartScreenState extends State<CartScreen>
     }
   }
 
-  // PERBAIKAN: Handle null safety untuk produk
   double _calculateSubtotal(Keranjang item) {
     final produk = item.produk;
     if (produk == null) return 0.0;
-    
+
     if (produk.adaDiskon) {
       return produk.hargaSetelahDiskon * item.jumlah;
     } else {
@@ -294,18 +294,17 @@ class _CartScreenState extends State<CartScreen>
     );
   }
 
-  // PERBAIKAN: Tambahkan null safety untuk produk dan handle kasus produk null
   Widget _buildCartItem(Keranjang item) {
     final produk = item.produk;
-    
-    // Jika produk null, tampilkan item error
+
     if (produk == null) {
       return _buildInvalidCartItem(item);
     }
-    
+
     final hasDiscount = produk.adaDiskon;
     final isOutOfStock = item.jumlah > produk.stok;
-    final hargaSetelahDiskon = hasDiscount ? produk.hargaSetelahDiskon : produk.harga;
+    final hargaSetelahDiskon =
+        hasDiscount ? produk.hargaSetelahDiskon : produk.harga;
     final subtotal = _calculateSubtotal(item);
 
     return Container(
@@ -623,7 +622,6 @@ class _CartScreenState extends State<CartScreen>
     );
   }
 
-  // Widget untuk menangani item keranjang dengan produk null
   Widget _buildInvalidCartItem(Keranjang item) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -635,7 +633,8 @@ class _CartScreenState extends State<CartScreen>
       ),
       child: Row(
         children: [
-          Icon(FontAwesomeIcons.exclamationTriangle, color: Colors.red, size: 24),
+          Icon(FontAwesomeIcons.exclamationTriangle,
+              color: Colors.red, size: 24),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -858,38 +857,36 @@ class _CartScreenState extends State<CartScreen>
     );
   }
 
-  // PERBAIKAN: Update method untuk menggunakan method yang ada di AppProvider
+  // PERBAIKAN: Update quantity dengan API
   void _updateQuantity(Keranjang item, int newQuantity) {
-    if (newQuantity < 1) return;
+    if (newQuantity < 1) {
+      _deleteItem(item);
+      return;
+    }
 
-    final provider = Provider.of<AppProvider>(context, listen: false);
-    // Ganti dengan method yang sesuai di AppProvider
-    // provider.updateCartItemQuantity(item, newQuantity).then((_) {
-    //   setState(() {
-    //     _keranjangItems = provider.keranjang;
-    //   });
-    // }).catchError((error) {
-    //   _showError('Gagal mengupdate jumlah: $error');
-    // });
-    
-    // Temporary solution - update local state
+    if (item.produk != null && newQuantity > item.produk!.stok) {
+      _showStockWarning(item.produk!.stok);
+      return;
+    }
+
     setState(() {
-      final index = _keranjangItems.indexWhere((i) => i.id == item.id);
-      if (index != -1) {
-        _keranjangItems[index] = Keranjang(
-          id: item.id,
-          userId: item.userId,
-          produkId: item.produkId,
-          jumlah: newQuantity,
-          produk: item.produk,
-        );
-      }
+      _isLoading = true;
+    });
+
+    ApiService.updateCart(item.id, newQuantity).then((_) {
+      // Reload cart data
+      _loadCartData();
+    }).catchError((error) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Gagal mengupdate jumlah: $error';
+      });
     });
   }
 
   void _showDeleteConfirmation(Keranjang item) {
     final produkName = item.produk?.nama ?? 'Produk';
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -925,37 +922,27 @@ class _CartScreenState extends State<CartScreen>
     );
   }
 
-  // PERBAIKAN: Update method untuk menggunakan method yang ada di AppProvider
   void _deleteItem(Keranjang item) {
-    final provider = Provider.of<AppProvider>(context, listen: false);
-    final produkName = item.produk?.nama ?? 'Produk';
-    
-    // Ganti dengan method yang sesuai di AppProvider
-    // provider.removeFromKeranjang(item).then((_) {
-    //   setState(() {
-    //     _keranjangItems = provider.keranjang;
-    //   });
-    //   ScaffoldMessenger.of(context).showSnackBar(
-    //     SnackBar(
-    //       content: Text('$produkName dihapus dari keranjang'),
-    //       backgroundColor: Colors.green,
-    //     ),
-    //   );
-    // }).catchError((error) {
-    //   _showError('Gagal menghapus produk: $error');
-    // });
-    
-    // Temporary solution - remove from local state
     setState(() {
-      _keranjangItems.removeWhere((i) => i.id == item.id);
+      _isLoading = true;
     });
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$produkName dihapus dari keranjang'),
-        backgroundColor: Colors.green,
-      ),
-    );
+
+    ApiService.removeFromCart(item.id).then((_) {
+      // Reload cart data
+      _loadCartData();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content:
+              Text('${item.produk?.nama ?? 'Produk'} dihapus dari keranjang'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }).catchError((error) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Gagal menghapus produk: $error';
+      });
+    });
   }
 
   void _showStockWarning(int availableStock) {
@@ -1004,28 +991,42 @@ class _CartScreenState extends State<CartScreen>
     );
   }
 
+  // ========== PERUBAHAN PENTING ==========
+  // Method untuk navigasi ke CheckoutScreen
   void _checkoutItem(Keranjang item) {
-    final produkName = item.produk?.nama ?? 'Produk';
-    
-    // Navigate to checkout screen for single item
-    // Navigator.pushNamed(context, '/checkout', arguments: {'items': [item]});
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Checkout $produkName'),
-        backgroundColor: Colors.green,
+    final produk = item.produk;
+    if (produk == null) return;
+
+    // Navigate menggunakan Navigator.push bukan pushNamed
+    // karena kita perlu mengirim data langsung ke constructor
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CheckoutScreen(
+          produk: produk,
+          quantity: item.jumlah,
+        ),
       ),
     );
   }
 
   void _checkoutAll() {
-    // Navigate to checkout screen for all items
-    // Navigator.pushNamed(context, '/checkout', arguments: {'items': _keranjangItems});
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Checkout semua produk'),
-        backgroundColor: Colors.green,
-      ),
-    );
+    // Filter hanya produk yang stoknya mencukupi
+    final validItems = _keranjangItems.where((item) {
+      final produk = item.produk;
+      return produk != null && item.jumlah <= produk.stok;
+    }).toList();
+
+    if (validItems.isEmpty) {
+      _showGeneralStockWarning();
+      return;
+    }
+
+    // NOTE: Untuk sekarang, checkout satu produk dulu
+    // Nanti bisa dikembangkan untuk multi-checkout
+    if (validItems.isNotEmpty) {
+      _checkoutItem(validItems.first);
+    }
   }
 
   void _showError(String message) {
