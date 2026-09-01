@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../services/api_service.dart';
 
 // User Model
 class User {
@@ -23,7 +24,9 @@ class User {
           : int.tryParse(json['id'].toString()) ?? 0,
       name: json['name']?.toString() ?? '',
       email: json['email']?.toString() ?? '',
-      avatar: json['avatar']?.toString(),
+      avatar: json['avatar'] != null && json['avatar'].toString().isNotEmpty
+          ? ApiService.getImageUrl(json['avatar'].toString())
+          : null,
       role: json['role']?.toString() ?? 'pembeli',
     );
   }
@@ -71,7 +74,9 @@ class Kategori {
           : null,
       nama: json['nama']?.toString() ?? '',
       slug: json['slug']?.toString() ?? '',
-      gambar: json['gambar']?.toString(),
+      gambar: json['gambar'] != null && json['gambar'].toString().isNotEmpty
+          ? ApiService.getImageUrl(json['gambar'].toString())
+          : null,
       subkategoris: json['subkategoris'] != null
           ? (json['subkategoris'] as List)
               .map((i) => Kategori.fromJson(i))
@@ -148,7 +153,9 @@ class Produk {
           : (json['harga'] is int
               ? json['harga'].toDouble()
               : double.tryParse(json['harga'].toString()) ?? 0.0),
-      gambar: json['gambar']?.toString(),
+      gambar: json['gambar'] != null && json['gambar'].toString().isNotEmpty
+          ? ApiService.getImageUrl(json['gambar'].toString())
+          : null,
       stok: json['stok'] is int
           ? json['stok']
           : int.tryParse(json['stok'].toString()) ?? 0,
@@ -187,6 +194,8 @@ class Produk {
           : null,
     };
   }
+
+  int get kategoriId => kategoriProdukId;
 
   double get hargaSetelahDiskon {
     if (diskon != null && diskon!.isActive) {

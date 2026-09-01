@@ -4,7 +4,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../constants/colors.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
-import '../providers/app_provider.dart';
 
 class ProductSection extends StatelessWidget {
   final List<Produk> produks;

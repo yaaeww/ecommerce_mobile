@@ -7,6 +7,7 @@ class AppProvider with ChangeNotifier {
   List<Produk> _produks = [];
   List<Produk> _produksTerbaru = [];
   List<Keranjang> _keranjang = [];
+  List<Order> _orders = [];
   User? _user;
   bool _isLoading = false;
 
@@ -14,6 +15,7 @@ class AppProvider with ChangeNotifier {
   List<Produk> get produks => _produks;
   List<Produk> get produksTerbaru => _produksTerbaru;
   List<Keranjang> get keranjang => _keranjang;
+  List<Order> get orders => _orders;
   User? get user => _user;
   bool get isLoading => _isLoading;
 
@@ -74,6 +76,21 @@ class AppProvider with ChangeNotifier {
     }
   }
 
+  // Load Orders
+  Future<void> loadOrders() async {
+    _setLoading(true);
+    try {
+      _orders = await ApiService.getOrders();
+      notifyListeners();
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error loading orders: $e');
+      }
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   // Load Semua Produk
   Future<void> loadAllProduks() async {
     _setLoading(true);
@@ -106,6 +123,19 @@ class AppProvider with ChangeNotifier {
     try {
       await ApiService.addToCart(produk.id, jumlah);
       await loadKeranjang(); // Reload keranjang
+      notifyListeners();
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error adding to cart: $e');
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> tambahKeKeranjang(int produkId, int jumlah) async {
+    try {
+      await ApiService.addToCart(produkId, jumlah);
+      await loadKeranjang();
       notifyListeners();
     } catch (e) {
       if (kDebugMode) {

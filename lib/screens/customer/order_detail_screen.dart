@@ -56,7 +56,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final totalHarga = subtotalPerItem * widget.order.jumlah;
 
     return Scaffold(
-      backgroundColor: AppColors.darkBlue,
+      backgroundColor: AppColors.background,
       body: Stack(
         children: [
           // Background gradient

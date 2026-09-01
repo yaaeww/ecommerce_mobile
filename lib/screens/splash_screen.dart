@@ -3,11 +3,7 @@ import 'package:provider/provider.dart';
 import '../constants/colors.dart';
 import '../providers/app_provider.dart';
 import '../services/auth_service.dart';
-import 'home_screen.dart';
-import 'auth/login_screen.dart';
-import 'admin/admin_dashboard.dart';
-import 'seller/seller_dashboard.dart';
-import 'customer/customer_dashboard.dart';
+import '../navigation/bottom_nav_shell.dart';
 import 'connection_error_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -30,114 +26,64 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _initializeApp() async {
-    // Tunggu sebentar untuk animasi splash
     await Future.delayed(const Duration(milliseconds: 1500));
 
     if (!widget.isApiConnected) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const ConnectionErrorScreen()),
+        MaterialPageRoute(builder: (_) => const ConnectionErrorScreen()),
       );
       return;
     }
 
-    // Check authentication status
     try {
       final isLoggedIn = await AuthService.isLoggedIn();
-      
       if (isLoggedIn) {
         final userData = await AuthService.getUserData();
         if (userData != null) {
           final provider = Provider.of<AppProvider>(context, listen: false);
           provider.setUserFromMap(userData);
-          
-          // Navigate based on role
-          _navigateToDashboard(provider.user!.role);
+          // Role-based: all roles go to BottomNavShell, which handles per-tab routing
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const BottomNavShell()),
+          );
           return;
         }
       }
-      
-      // If not logged in, go to home screen
+
+      // Not logged in — show home (first tab: Beranda)
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
+        MaterialPageRoute(builder: (_) => const BottomNavShell()),
       );
     } catch (e) {
-      print('Error during initialization: $e');
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
+        MaterialPageRoute(builder: (_) => const BottomNavShell()),
       );
-    }
-  }
-
-  void _navigateToDashboard(String role) {
-    switch (role) {
-      case 'admin':
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const AdminDashboardScreen()),
-        );
-        break;
-      case 'penjual':
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const SellerDashboardScreen()),
-        );
-        break;
-      case 'pembeli':
-      default:
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const CustomerDashboardScreen()),
-        );
-        break;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.darkBlue,
+      backgroundColor: AppColors.background,
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Logo
-            Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                color: AppColors.gold,
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: const Icon(
-                Icons.store,
-                color: AppColors.darkBlue,
-                size: 60,
-              ),
-            ),
-            const SizedBox(height: 30),
-            Text(
-              'UMKM Indramayu',
-              style: TextStyle(
-                color: AppColors.gold,
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 20),
-            CircularProgressIndicator(color: AppColors.gold),
-            const SizedBox(height: 20),
-            Text(
-              'Memuat...',
-              style: TextStyle(
-                color: AppColors.textLight,
-                fontSize: 16,
-              ),
-            ),
-          ],
-        ),
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(color: AppColors.emerald, borderRadius: BorderRadius.circular(24)),
+            child: const Icon(Icons.store, color: Colors.white, size: 60),
+          ),
+          const SizedBox(height: 30),
+          Text('UMKM Indramayu', style: TextStyle(color: AppColors.emerald, fontSize: 32, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 20),
+          const CircularProgressIndicator(color: AppColors.emerald),
+          const SizedBox(height: 20),
+          Text('Memuat...', style: TextStyle(color: AppColors.textGrey, fontSize: 16)),
+        ]),
       ),
     );
   }

@@ -1,4 +1,4 @@
-// screens/midtrans_payment_screen.dart (versi final)
+// screens/midtrans_payment_screen.dart (fixed v2 — corrected JS channel mismatch)
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -9,88 +9,54 @@ class MidtransPaymentScreen extends StatefulWidget {
   final int orderId;
 
   const MidtransPaymentScreen({
-    Key? key,
+    super.key,
     required this.snapToken,
     required this.orderId,
-  }) : super(key: key);
+  });
 
   @override
   State<MidtransPaymentScreen> createState() => _MidtransPaymentScreenState();
 }
 
 class _MidtransPaymentScreenState extends State<MidtransPaymentScreen> {
-  late WebViewController _controller;
+  late final WebViewController _controller;
   bool _isLoading = true;
 
-  String get _paymentUrl {
-    // Create HTML for Midtrans payment
-    return '''
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta name="viewport" content="width=device-width, initial-scale=1">
-      <style>
-        body {
-          margin: 0;
-          padding: 0;
-          font-family: Arial, sans-serif;
-          background: #0a1628;
-          color: white;
-        }
-        .container {
-          max-width: 600px;
-          margin: 0 auto;
-          padding: 20px;
-        }
-        .loading {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          height: 100vh;
-        }
-        .loading-spinner {
-          border: 4px solid #f3f3f3;
-          border-top: 4px solid #ffd700;
-          border-radius: 50%;
-          width: 40px;
-          height: 40px;
-          animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div id="snap-container"></div>
-      </div>
-      
-      <script src="https://app.sandbox.midtrans.com/snap/snap.js" 
-              data-client-key="SB-Mid-client-YourClientKey"></script>
-      <script>
-        // Your Midtrans Snap configuration
-        window.snap.pay('${widget.snapToken}', {
-          onSuccess: function(result) {
-            window.flutter_inappwebview.callHandler('paymentSuccess', result);
-          },
-          onPending: function(result) {
-            window.flutter_inappwebview.callHandler('paymentPending', result);
-          },
-          onError: function(result) {
-            window.flutter_inappwebview.callHandler('paymentError', result);
-          },
-          onClose: function() {
-            window.flutter_inappwebview.callHandler('paymentClosed');
-          }
-        });
-      </script>
-    </body>
-    </html>
-    ''';
-  }
+  /// Fixed: JS channel name must match what the injected JS calls.
+  /// Previously used `flutter_inappwebview.callHandler()` (wrong package)
+  /// with a `webview_flutter` JavaScriptChannel named 'PaymentHandler' (no bridge).
+  /// Now JS calls `Flutter.postMessage()` which webview_flutter routes to
+  /// the registered 'PaymentHandler' JavaScriptChannel.
+  String get _paymentHtml => '''
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { margin: 0; padding: 0; font-family: Arial, sans-serif; background: #0a1628; color: white; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
+    .loading-spinner { border: 4px solid #f3f3f3; border-top: 4px solid #f59e0b; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="snap-container"></div>
+  </div>
+  <script src="https://app.sandbox.midtrans.com/snap/snap.js" data-client-key="SB-Mid-client-YourClientKey"></script>
+  <script>
+    // Fixed: use Flutter.postMessage (webview_flutter bridge) not flutter_inappwebview
+    window.snap.pay('\${widget.snapToken}', {
+      onSuccess: function(result) { Flutter.postMessage('paymentSuccess:' + JSON.stringify(result)); },
+      onPending: function(result) { Flutter.postMessage('paymentPending:' + JSON.stringify(result)); },
+      onError: function(result) { Flutter.postMessage('paymentError:' + JSON.stringify(result)); },
+      onClose: function() { Flutter.postMessage('paymentClosed'); }
+    });
+  </script>
+</body>
+</html>
+''';
 
   @override
   void initState() {
@@ -98,42 +64,27 @@ class _MidtransPaymentScreenState extends State<MidtransPaymentScreen> {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..addJavaScriptChannel('PaymentHandler',
-          onMessageReceived: (JavaScriptMessage message) {
-        _handlePaymentMessage(message.message);
-      })
-      ..setBackgroundColor(const Color(0xFF0a1628))
+          onMessageReceived: _onJsMessage)
+      ..setBackgroundColor(AppColors.darkBlue)
       ..setNavigationDelegate(
         NavigationDelegate(
-          onPageStarted: (String url) {
-            setState(() {
-              _isLoading = true;
-            });
-          },
-          onPageFinished: (String url) {
-            setState(() {
-              _isLoading = false;
-            });
-          },
+          onPageStarted: (_) => setState(() => _isLoading = true),
+          onPageFinished: (_) => setState(() => _isLoading = false),
         ),
       )
-      ..loadHtmlString(_paymentUrl);
+      ..loadHtmlString(_paymentHtml);
   }
 
-  void _handlePaymentMessage(String message) {
-    // Handle payment callbacks from JavaScript
-    switch (message) {
-      case 'paymentSuccess':
-        _showPaymentResult('Pembayaran Berhasil', true);
-        break;
-      case 'paymentPending':
-        _showPaymentResult('Menunggu Pembayaran', false);
-        break;
-      case 'paymentError':
-        _showPaymentResult('Pembayaran Gagal', false);
-        break;
-      case 'paymentClosed':
-        Navigator.pop(context);
-        break;
+  void _onJsMessage(JavaScriptMessage message) {
+    final msg = message.message;
+    if (msg.startsWith('paymentSuccess:')) {
+      _showPaymentResult('Pembayaran Berhasil', true);
+    } else if (msg.startsWith('paymentPending:')) {
+      _showPaymentResult('Menunggu Pembayaran', false);
+    } else if (msg.startsWith('paymentError:')) {
+      _showPaymentResult('Pembayaran Gagal', false);
+    } else if (msg == 'paymentClosed') {
+      Navigator.pop(context);
     }
   }
 
@@ -145,41 +96,24 @@ class _MidtransPaymentScreenState extends State<MidtransPaymentScreen> {
         backgroundColor: const Color(0xFF1E1E2E),
         title: Row(
           children: [
-            Icon(
-              isSuccess ? Icons.check_circle : Icons.error,
-              color: isSuccess ? Colors.green : Colors.red,
-            ),
+            Icon(isSuccess ? Icons.check_circle : Icons.error, color: isSuccess ? Colors.green : Colors.red),
             const SizedBox(width: 12),
             Text(
               isSuccess ? 'Berhasil' : 'Perhatian',
-              style: TextStyle(
-                color: isSuccess ? Colors.green : Colors.red,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(color: isSuccess ? Colors.green : Colors.red, fontWeight: FontWeight.bold),
             ),
           ],
         ),
-        content: Text(
-          message,
-          style: const TextStyle(color: Colors.white70),
-        ),
+        content: Text(message, style: const TextStyle(color: Colors.white70)),
         actions: [
           TextButton(
             onPressed: () {
               Navigator.pop(context);
               if (isSuccess) {
-                // Navigate to invoice/order history
-                Navigator.pushNamedAndRemoveUntil(
-                  context,
-                  '/customer-dashboard',
-                  (route) => false,
-                );
+                Navigator.pushNamedAndRemoveUntil(context, '/customer-dashboard', (route) => false);
               }
             },
-            child: Text(
-              'OK',
-              style: TextStyle(color: AppColors.gold),
-            ),
+            child: Text('OK', style: TextStyle(color: AppColors.mango)),
           ),
         ],
       ),
@@ -189,18 +123,15 @@ class _MidtransPaymentScreenState extends State<MidtransPaymentScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.darkBlue,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
+        backgroundColor: AppColors.surface,
+        elevation: 1,
         leading: IconButton(
-          icon: Icon(FontAwesomeIcons.arrowLeft, color: AppColors.gold),
+          icon: Icon(FontAwesomeIcons.arrowLeft, color: AppColors.emerald),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(
-          'Pembayaran',
-          style: TextStyle(color: AppColors.gold),
-        ),
+        title: Text('Pembayaran', style: TextStyle(color: AppColors.textDark)),
       ),
       body: Stack(
         children: [
@@ -209,20 +140,11 @@ class _MidtransPaymentScreenState extends State<MidtransPaymentScreen> {
             Container(
               color: Colors.black.withOpacity(0.8),
               child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const CircularProgressIndicator(color: AppColors.gold),
-                    const SizedBox(height: 20),
-                    Text(
-                      'Memuat halaman pembayaran...',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ],
-                ),
+                child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  const CircularProgressIndicator(color: AppColors.mango),
+                  const SizedBox(height: 20),
+                  Text('Memuat halaman pembayaran...', style: TextStyle(color: Colors.white, fontSize: 16)),
+                ]),
               ),
             ),
         ],

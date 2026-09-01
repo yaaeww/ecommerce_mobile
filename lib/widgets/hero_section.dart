@@ -1,245 +1,218 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:umkm_indramayu_mobile/constants/colors.dart';
 
-class HeroSection extends StatelessWidget {
+/// Modern Hero Banner with gradient, badges, and seasonal mango promotion
+class HeroSection extends StatefulWidget {
   const HeroSection({super.key});
+
+  @override
+  State<HeroSection> createState() => _HeroSectionState();
+}
+
+class _HeroSectionState extends State<HeroSection> {
+  final PageController _pageController = PageController();
+  int _currentPage = 0;
+
+  final List<Map<String, dynamic>> _banners = [
+    {
+      'badge': '🥭 PANEN RAYA 2026',
+      'title': 'Mangga Gedong Gincu Asli Indramayu',
+      'subtitle': 'Dipetik langsung dari perkebunan pilihan • Manis & Segar',
+      'tag': 'Diskon s/d 30%',
+      'bgGradient': [const Color(0xFF047857), const Color(0xFF059669), const Color(0xFF10B981)],
+      'accentColor': const Color(0xFFFCD34D),
+      'icon': FontAwesomeIcons.certificate,
+    },
+    {
+      'badge': '⭐ PRODUK UMKM LOKAL',
+      'title': 'Aneka Olahan Mangga Gurih & Legit',
+      'subtitle': 'Dodol, Keripik, Sirup & Sambal khas Dermayu',
+      'tag': '100% Organik',
+      'bgGradient': [const Color(0xFFB45309), const Color(0xFFD97706), const Color(0xFFF59E0B)],
+      'accentColor': const Color(0xFFFEF3C7),
+      'icon': FontAwesomeIcons.shieldHeart,
+    },
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.85,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.darkBlue,
-            AppColors.mediumBlue,
-            AppColors.lightBlue
-          ],
-        ),
-      ),
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      height: 155,
       child: Stack(
         children: [
-          // Animated Background
-          Positioned.fill(
-            child: CustomPaint(
-              painter: _HeroBackgroundPainter(),
-            ),
+          PageView.builder(
+            controller: _pageController,
+            onPageChanged: (index) => setState(() => _currentPage = index),
+            itemCount: _banners.length,
+            itemBuilder: (context, index) {
+              final banner = _banners[index];
+              return Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: banner['bgGradient'] as List<Color>,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (banner['bgGradient'] as List<Color>).first.withOpacity(0.3),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Stack(
+                  children: [
+                    // Decorative Background Circle
+                    Positioned(
+                      right: -20,
+                      bottom: -20,
+                      child: Container(
+                        width: 130,
+                        height: 130,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withOpacity(0.08),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      right: 15,
+                      top: 15,
+                      child: Icon(
+                        banner['icon'] as IconData,
+                        size: 64,
+                        color: Colors.white.withOpacity(0.15),
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: Colors.white.withOpacity(0.3)),
+                              ),
+                              child: Text(
+                                banner['badge'] as String,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: banner['accentColor'] as Color,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                banner['tag'] as String,
+                                style: const TextStyle(
+                                  color: Color(0xFF1F2937),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              banner['title'] as String,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                height: 1.2,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              banner['subtitle'] as String,
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.9),
+                                fontSize: 11,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Beli Sekarang',
+                                    style: TextStyle(
+                                      color: Color(0xFF047857),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  SizedBox(width: 4),
+                                  Icon(
+                                    Icons.arrow_forward_rounded,
+                                    size: 12,
+                                    color: Color(0xFF047857),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
-
-          // Content
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 80),
+          // Page Indicator Dots
+          Positioned(
+            bottom: 10,
+            right: 18,
             child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // Title
-                      ShaderMask(
-                        shaderCallback: (bounds) => const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [AppColors.gold, AppColors.goldLight],
-                        ).createShader(bounds),
-                        child: const Text(
-                          'Digitalisasi UMKM\nIndramayu',
-                          style: TextStyle(
-                            fontSize: 36,
-                            fontWeight: FontWeight.w800,
-                            height: 1.2,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Description
-                      const Text(
-                        'Platform modern untuk memajukan produk lokal UMKM Indramayu melalui katalog online yang mudah, efisien, dan terpercaya.',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: AppColors.textGrey,
-                          height: 1.6,
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-
-                      // Buttons
-                      Row(
-                        children: [
-                          ElevatedButton(
-                            onPressed: () {
-                              // Scroll to products
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.gold,
-                              foregroundColor: AppColors.darkBlue,
-                              elevation: 6,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(50),
-                              ),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 32,
-                                vertical: 16,
-                              ),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(FontAwesomeIcons.rocket, size: 16),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Jelajahi Produk',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 20),
-                          TextButton(
-                            onPressed: () {
-                              // Show about dialog
-                            },
-                            style: TextButton.styleFrom(
-                              foregroundColor: AppColors.gold,
-                            ),
-                            child: const Row(
-                              children: [
-                                Icon(FontAwesomeIcons.playCircle, size: 16),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Pelajari Lebih Lanjut',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+              children: List.generate(
+                _banners.length,
+                (i) => Container(
+                  width: _currentPage == i ? 16 : 6,
+                  height: 6,
+                  margin: const EdgeInsets.symmetric(horizontal: 2),
+                  decoration: BoxDecoration(
+                    color: _currentPage == i ? Colors.white : Colors.white.withOpacity(0.4),
+                    borderRadius: BorderRadius.circular(3),
                   ),
                 ),
-
-                // Illustration (hidden on small screens)
-                if (MediaQuery.of(context).size.width > 800)
-                  Expanded(
-                    child: Center(
-                      child: _buildCartoonIllustration(),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCartoonIllustration() {
-    return Container(
-      width: 300,
-      height: 300,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: AppColors.gold.withOpacity(0.1),
-      ),
-      child: Stack(
-        children: [
-          // Seller Avatar
-          Center(
-            child: Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                color: AppColors.gold,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                FontAwesomeIcons.store,
-                color: AppColors.darkBlue,
-                size: 50,
               ),
             ),
           ),
-
-          // Floating Products
-          Positioned(
-            top: 50,
-            left: 50,
-            child: _buildFloatingProduct(Icons.shopping_bag, Colors.red),
-          ),
-          Positioned(
-            top: 50,
-            right: 50,
-            child: _buildFloatingProduct(Icons.eco, Colors.green),
-          ),
-          Positioned(
-            bottom: 50,
-            left: 80,
-            child:
-                _buildFloatingProduct(Icons.emoji_food_beverage, Colors.yellow),
-          ),
-          Positioned(
-            bottom: 50,
-            right: 80,
-            child: _buildFloatingProduct(Icons.handyman, Colors.blue),
-          ),
         ],
       ),
     );
   }
-
-  Widget _buildFloatingProduct(IconData icon, Color color) {
-    return Container(
-      width: 50,
-      height: 50,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(8),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.5),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Icon(icon, color: Colors.white, size: 24),
-    );
-  }
-}
-
-class _HeroBackgroundPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppColors.gold.withOpacity(0.08)
-      ..style = PaintingStyle.fill;
-
-    // Draw circles for background effect
-    canvas.drawCircle(
-      Offset(size.width * 0.2, size.height * 0.5),
-      size.width * 0.3,
-      paint,
-    );
-
-    canvas.drawCircle(
-      Offset(size.width * 0.8, size.height * 0.8),
-      size.width * 0.2,
-      paint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

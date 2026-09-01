@@ -1,10 +1,20 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
+import 'auth_service.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://localhost:8000/api';
+  static String get baseUrl {
+    if (kIsWeb) {
+      return 'http://127.0.0.1:8000/api';
+    }
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://10.0.2.2:8000/api';
+    }
+    return 'http://127.0.0.1:8000/api';
+  }
 
   // Helper method untuk mendapatkan token
   static Future<String?> _getToken() async {
@@ -94,10 +104,12 @@ class ApiService {
   static Future<Map<String, dynamic>> login(
       String email, String password) async {
     try {
-      print('Attempting login for email: $email');
       final response = await http.post(
         Uri.parse('$baseUrl/login'),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
         body: json.encode({
           'email': email,
           'password': password,
@@ -105,45 +117,70 @@ class ApiService {
       );
 
       final responseData = _handleResponse(response);
+      final dynamic rawData = responseData['data'] ?? responseData;
 
-      // Simpan token jika ada
-      if (responseData['token'] != null) {
-        await saveToken(responseData['token']);
+      if (rawData is Map<String, dynamic>) {
+        final token = rawData['token']?.toString();
+        if (token != null && token.isNotEmpty) {
+          await saveToken(token);
+        }
+
+        final userData = rawData['user'];
+        if (userData is Map<String, dynamic>) {
+          await AuthService.saveUserData(userData);
+        }
       }
 
       return responseData;
     } catch (e) {
       print('Login error: $e');
-      throw Exception('Login gagal: $e');
+      rethrow;
     }
   }
 
   // POST Register
-  static Future<Map<String, dynamic>> register(
-      String name, String email, String password, String role) async {
+  static Future<Map<String, dynamic>> register({
+    required String name,
+    required String email,
+    required String password,
+    required String passwordConfirmation,
+    String role = 'pembeli',
+  }) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/register'),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
         body: json.encode({
           'name': name,
           'email': email,
           'password': password,
-          'password_confirmation': password,
+          'password_confirmation': passwordConfirmation,
           'role': role,
         }),
       );
 
       final responseData = _handleResponse(response);
+      final dynamic rawData = responseData['data'] ?? responseData;
 
-      // Simpan token jika ada
-      if (responseData['token'] != null) {
-        await saveToken(responseData['token']);
+      if (rawData is Map<String, dynamic>) {
+        final token = rawData['token']?.toString();
+        if (token != null && token.isNotEmpty) {
+          await saveToken(token);
+        }
+
+        final userData = rawData['user'];
+        if (userData is Map<String, dynamic>) {
+          await AuthService.saveUserData(userData);
+        }
       }
 
       return responseData;
     } catch (e) {
-      throw Exception('Registrasi gagal: $e');
+      print('Register error: $e');
+      rethrow;
     }
   }
 
@@ -505,42 +542,38 @@ class ApiService {
   // ========== IMAGE HANDLING ==========
   // Helper untuk build image URL
   static String getImageUrl(String? imagePath) {
-    if (imagePath == null) {
-      print('Image path is null');
+    if (imagePath == null || imagePath.trim().isEmpty) {
       return '';
     }
 
-    // Debug log
-    print('Original image path: $imagePath');
+    String path = imagePath.trim();
 
     // Jika sudah full URL
-    if (imagePath.startsWith('http')) {
-      return imagePath;
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return path;
     }
 
-    // Handle berbagai format path
-    String correctedPath = imagePath;
-
-    // Jika path dimulai dengan storage/ tapi ada duplikasi
-    if (correctedPath.startsWith('storage/')) {
-      // Format: storage/produks/xxx.jpg -> sudah benar
-    } else if (correctedPath.startsWith('produks/')) {
-      // Format: produks/xxx.jpg -> tambahkan storage/
-      correctedPath = 'storage/$correctedPath';
-    } else if (!correctedPath.contains('/')) {
-      // Format: filename.jpg -> asumsi di folder produks
-      correctedPath = 'storage/produks/$correctedPath';
+    // Bersihkan leading slash
+    if (path.startsWith('/')) {
+      path = path.substring(1);
     }
 
-    // Pastikan tidak ada duplikasi storage/
-    if (correctedPath.startsWith('storage/storage/')) {
-      correctedPath =
-          correctedPath.replaceFirst('storage/storage/', 'storage/');
+    // Tangani awalan
+    if (path.startsWith('storage/')) {
+      // sudah benar
+    } else if (path.startsWith('produks/') || path.startsWith('kategori/') || path.startsWith('logos/')) {
+      path = 'storage/$path';
+    } else {
+      path = 'storage/produks/$path';
     }
 
-    final fullUrl = 'http://localhost:8000/$correctedPath';
-    print('Final image URL: $fullUrl');
-    return fullUrl;
+    // Hapus duplikasi jika ada
+    while (path.startsWith('storage/storage/')) {
+      path = path.replaceFirst('storage/storage/', 'storage/');
+    }
+
+    final host = baseUrl.replaceAll('/api', '');
+    return '$host/$path';
   }
 
   // Test koneksi API
