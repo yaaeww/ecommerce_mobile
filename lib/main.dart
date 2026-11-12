@@ -11,6 +11,7 @@ import 'package:umkm_indramayu_mobile/screens/customer/cart_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await ApiService.initBaseUrl();
   final isApiConnected = await ApiService.testConnection();
   runApp(MyApp(isApiConnected: isApiConnected));
 }

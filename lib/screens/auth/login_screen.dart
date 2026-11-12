@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 import '../../constants/colors.dart';
 import '../../providers/app_provider.dart';
 import '../../services/api_service.dart';
@@ -27,16 +29,133 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  Future<void> _login() async {
+  void _login() {
     if (!_formKey.currentState!.validate()) return;
+    if (kIsWeb) {
+      _showWebCaptchaDialog();
+    } else {
+      _showCaptchaModal();
+    }
+  }
 
+  void _showWebCaptchaDialog() {
+    bool isChecking = false;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.emerald.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.shield_outlined, color: AppColors.emerald, size: 22),
+              ),
+              const SizedBox(width: 10),
+              const Text('Verifikasi Keamanan', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Centang verifikasi berikut untuk melanjutkan masuk ke akun:',
+                style: TextStyle(fontSize: 12, color: Colors.black54),
+              ),
+              const SizedBox(height: 18),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFCBD5E1)),
+                ),
+                child: Row(
+                  children: [
+                    if (isChecking)
+                      const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.emerald),
+                      )
+                    else
+                      Checkbox(
+                        value: false,
+                        activeColor: AppColors.emerald,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                        onChanged: (val) {
+                          setDialogState(() => isChecking = true);
+                          Future.delayed(const Duration(milliseconds: 500), () {
+                            if (!mounted) return;
+                            if (ctx.mounted) {
+                              Navigator.of(ctx).pop();
+                            }
+                            _performLogin('web_verified');
+                          });
+                        },
+                      ),
+                    const SizedBox(width: 10),
+                    const Text(
+                      'Saya bukan robot',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Icon(Icons.verified, color: Colors.blue, size: 20),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Batal', style: TextStyle(color: Colors.grey)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showCaptchaModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _CaptchaBottomSheet(
+        siteKey: ApiService.recaptchaSiteKey,
+        onVerified: (String token) {
+          Navigator.of(ctx).pop();
+          _performLogin(token);
+        },
+      ),
+    );
+  }
+
+  Future<void> _performLogin(String captchaToken) async {
     setState(() => _isLoading = true);
 
     try {
       final response = await ApiService.login(
         _emailController.text.trim(),
         _passwordController.text,
+        captchaToken: captchaToken,
       );
+
+      if (!mounted) return;
 
       final dynamic rawData = response['data'] ?? response;
       if (rawData is Map<String, dynamic> && rawData['user'] != null) {
@@ -180,7 +299,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     border: Border.all(color: const Color(0xFFE2E8F0)),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.02),
+                        color: Colors.black.withValues(alpha: 0.02),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -416,6 +535,164 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _CaptchaBottomSheet extends StatefulWidget {
+  final String siteKey;
+  final Function(String token) onVerified;
+
+  const _CaptchaBottomSheet({
+    required this.siteKey,
+    required this.onVerified,
+  });
+
+  @override
+  State<_CaptchaBottomSheet> createState() => _CaptchaBottomSheetState();
+}
+
+class _CaptchaBottomSheetState extends State<_CaptchaBottomSheet> {
+  WebViewController? _webController;
+  bool _isLoading = true;
+
+  String get _htmlContent => '''
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 24px 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #FFFFFF;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div class="g-recaptcha" data-sitekey="${widget.siteKey}" data-callback="onCaptchaToken"></div>
+  <script>
+    function onCaptchaToken(token) {
+      if (typeof CaptchaBridge !== 'undefined' && CaptchaBridge.postMessage) {
+        CaptchaBridge.postMessage(token);
+      } else if (window.CaptchaBridge && window.CaptchaBridge.postMessage) {
+        window.CaptchaBridge.postMessage(token);
+      }
+    }
+  </script>
+</body>
+</html>
+''';
+
+  @override
+  void initState() {
+    super.initState();
+    if (!kIsWeb) {
+      _webController = WebViewController()
+        ..setJavaScriptMode(JavaScriptMode.unrestricted)
+        ..addJavaScriptChannel(
+          'CaptchaBridge',
+          onMessageReceived: (JavaScriptMessage msg) {
+            if (msg.message.isNotEmpty) {
+              widget.onVerified(msg.message);
+            }
+          },
+        )
+        ..setNavigationDelegate(
+          NavigationDelegate(
+            onPageFinished: (_) {
+              if (mounted) setState(() => _isLoading = false);
+            },
+          ),
+        )
+        ..loadHtmlString(_htmlContent, baseUrl: 'http://localhost');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 480,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.emerald.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.security, color: AppColors.emerald, size: 20),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Verifikasi Keamanan',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E293B),
+                        ),
+                      ),
+                      Text(
+                        'Centang kotak di bawah untuk melanjutkan',
+                        style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.grey),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: Stack(
+              children: [
+                if (!kIsWeb && _webController != null)
+                  WebViewWidget(controller: _webController!)
+                else
+                  const Center(
+                    child: Text('Verifikasi khusus aplikasi mobile (Android/iOS).'),
+                  ),
+                if (_isLoading && !kIsWeb)
+                  const Center(
+                    child: CircularProgressIndicator(color: AppColors.emerald),
+                  ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

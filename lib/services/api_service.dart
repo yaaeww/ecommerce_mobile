@@ -6,7 +6,43 @@ import '../models/models.dart';
 import 'auth_service.dart';
 
 class ApiService {
+  static const String recaptchaSiteKey = '6LdRtxwuAAAAAF6ONKNHxczMpAR6TwVd7VPyPTlH';
+
+  static String? _customBaseUrl;
+
+  /// Memuat custom base URL jika pernah disimpan oleh pengguna
+  static Future<void> initBaseUrl() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _customBaseUrl = prefs.getString('custom_server_base_url');
+    } catch (_) {}
+  }
+
+  /// Mengubah custom base URL (misal beralih antara IP laptop, emulator, atau HP)
+  static Future<void> setCustomBaseUrl(String? newUrl) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (newUrl == null || newUrl.trim().isEmpty) {
+        _customBaseUrl = null;
+        await prefs.remove('custom_server_base_url');
+      } else {
+        String cleanUrl = newUrl.trim();
+        if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
+          cleanUrl = 'http://$cleanUrl';
+        }
+        if (!cleanUrl.endsWith('/api')) {
+          cleanUrl = cleanUrl.endsWith('/') ? '${cleanUrl}api' : '$cleanUrl/api';
+        }
+        _customBaseUrl = cleanUrl;
+        await prefs.setString('custom_server_base_url', _customBaseUrl!);
+      }
+    } catch (_) {}
+  }
+
   static String get baseUrl {
+    if (_customBaseUrl != null && _customBaseUrl!.isNotEmpty) {
+      return _customBaseUrl!;
+    }
     if (kIsWeb) {
       return 'http://127.0.0.1:8000/api';
     }
@@ -102,7 +138,7 @@ class ApiService {
   // ========== AUTHENTICATION ==========
   // POST Login
   static Future<Map<String, dynamic>> login(
-      String email, String password) async {
+      String email, String password, {String? captchaToken}) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/login'),
@@ -113,6 +149,8 @@ class ApiService {
         body: json.encode({
           'email': email,
           'password': password,
+          if (captchaToken != null && captchaToken.isNotEmpty)
+            'g-recaptcha-response': captchaToken,
         }),
       );
 
